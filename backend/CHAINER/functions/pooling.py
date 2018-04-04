@@ -1,0 +1,1 @@
+from chainer.functions.pooling.max_pooling_2d import max_pooling_2d
