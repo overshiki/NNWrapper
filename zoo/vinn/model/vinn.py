@@ -16,7 +16,7 @@ import math, re
 
 import chainer
 
-
+#TODO: consider directly wrap chainer.Variable operation in local Variable
 
 class model(Graph):
 	'''
@@ -176,7 +176,7 @@ class pnn_layer(Graph):
 			INDEX.append([i+x*self.dilation for x in range(self.size)])
 
 		INDEX = self.op.array(INDEX)
-		outputs = X.ndarray()[INDEX.ndarray()]
+		outputs = X.ndarray[INDEX.ndarray]
 		outputs = outputs.sum(axis=1)
 		#now is of F*N*S*k
 

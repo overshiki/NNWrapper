@@ -33,6 +33,7 @@ class TensorBase:
 		# self.op = operation(device=self.device)
 		self.guard = device_guard(device=self.device)
 		self.guard.use()
+		#TODO: use decorator for the guard
 		#use the selected device as default device
 
 		self.data = None
@@ -40,7 +41,15 @@ class TensorBase:
 	def guard(self):
 		return self.guard
 
+	def new(self, *args, **kwargs):
+		r"""Constructs a new variable of the same data type as :attr:`self` variable.
+		"""
+		return self.__class__(*args, **kwargs)
+
+	@property
 	def ndarray(self):
+		r'''for safety consideration, only set getter for ndarray, which means no access to changing the value of self._data
+		'''
 		return self.data
 
 	def to_device(self, device):
@@ -63,140 +72,57 @@ class TensorBase:
 
 		self.guard = device_guard(device=self.device)
 
-
+	@property
 	def shape(self):
 		return self.data.shape
 
+	@property
 	def ndim(self):
 		return self.data.ndim
 
+	@property
 	def dtype(self):
 		return self.data.dtype
 
+	@property
+	def size(self):
+		return self.data.size
+
 	def __repr__(self):
-		return self.ndarray().__str__()+" on device {}".format(self.device)
+		return self.ndarray.__str__()+" on device {}".format(self.device)
 	def __str__(self):
 		return self.__repr__()
 
 	def cast(self, dtype):
-		self.data = self.ndarray().astype(dtype)
+		self.data = self.ndarray.astype(dtype)
 
 	def astype(self, dtype):
-		return tensor(self.ndarray().astype(_type), device=self.device)
+		return tensor(self.ndarray.astype(_type), device=self.device)
 
 	def reshape(self, *x):
-		return tensor(self.ndarray().reshape(*x), device=self.device)
+		return tensor(self.ndarray.reshape(*x), device=self.device)
 
 	def sum(self, *x, **kwarg):
-		return tensor(self.ndarray().sum(*x, **kwarg), device=self.device)
+		return tensor(self.ndarray.sum(*x, **kwarg), device=self.device)
 
 	def max(self, *x, **kwarg):
-		return tensor(self.ndarray().max(*x, **kwarg), device=self.device)
+		return tensor(self.ndarray.max(*x, **kwarg), device=self.device)
 
 	def transpose(self, *x):
-		return tensor(self.ndarray().transpose(*x), device=self.device)
+		return tensor(self.ndarray.transpose(*x), device=self.device)
 
 	def __getitem__(self, item):
-		return tensor(self.ndarray()[item], device=self.device)
+		return tensor(self.ndarray[item], device=self.device)
 
 	def __len__(self):
-		return len(self.ndarray())
-
-	def type_check(self, other):
-		number_check = False
-		if isinstance(other, tensor):
-			var = other
-		elif isinstance(other, (np.ndarray, cp.ndarray)):
-			var = tensor(other, device=self.device)
-		elif isinstance(other, (int, float, complex, bool)):
-			var = other
-			number_check = True
-		else:
-			raise ValueError("input other is not numpy cupy ndarray nor tensor nor python variable, but to be: {}".format(type(other)))
-
-		if number_check==False:
-			if var.device!=self.device:
-				var.to_device(self.device)
-			return var.ndarray()
-		else:
-			return var
-
-	def mul(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() * var, device=self.device)
-
-	def __mul__(self, other):
-		return self.mul(other)
-
-	def add(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() + var, device=self.device)		
-
-	def __add__(self, other):
-		return self.add(other)
-
-	def sub(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() - var, device=self.device)		
-
-	def __sub__(self, other):
-		return self.sub(other)
-
-	def truediv(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() / var, device=self.device)
-
-	def __truediv__(self, other):
-		return self.truediv(other)
-
-	def floordiv(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() // var, device=self.device)	
-
-	def __floordiv__(self, other):
-		return self.floordiv(other)
-
-
-	def __lt__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() < var, device=self.device)
-
-	
-	def __le__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() <= var, device=self.device)
-	
-
-	def __eq__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() == var, device=self.device)
-
-
-	def __ne__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() != var, device=self.device)
-
-	def __gt__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() > var, device=self.device)
-
-	def __ge__(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() >= var, device=self.device)
-
-	def pow(self, other):
-		var = self.type_check(other)
-		return tensor(self.ndarray() ** var, device=self.device)
-
-	def __pow__(self, other):
-		return self.pow(other)
+		return len(self.ndarray)
 
 	def __copy__(self):
-		result = tensor(self.ndarray().copy(), device=self.device)
+		result = tensor(self.ndarray.copy(), device=self.device)
 		return result
 
 	def __deepcopy__(self, memo):
-		result = tensor(self.ndarray().copy(), device=self.device)
+		result = tensor(self.ndarray.copy(), device=self.device)
 		memo[id(self)] = result
 		return result
 
@@ -204,11 +130,30 @@ class TensorBase:
 
 class tensor(TensorBase):
 	r"""implementation of tensor data structure
+
+    .. note::
+        The following operators are defined for variable(s).
+        * Indexing: ``a[slices]`` (:meth:`__getitem__`)
+        * Addition: ``a + b`` (:meth:`__add__`, :meth:`__radd__`)
+        * Subtraction: ``a - b`` (:meth:`__sub__`, :meth:`__rsub__`)
+        * Multiplication: ``a * b`` (:meth:`__mul__`, :meth:`__rmul__`)
+        * Division: ``a / b`` (:meth:`__div__`, :meth:`__rdiv__`, \
+                               :meth:`__truediv__`, :meth:`__rtruediv__`)
+        * Floor Division: ``a // b`` (:meth:`__floordiv__`, \
+                                      :meth:`__rfloordiv__`)
+        * Exponentiation: ``a ** b`` (:meth:`__pow__`, :meth:`__rpow__`)
+        * Matirx Multiplication: ``a @ b`` (:meth:`__matmul__`, \
+                                            :meth:`__rmatmul__`)
+        * Negation (Arithmetic): ``- a`` (:meth:`__neg__`)
+
+    Args:
+        x (numpy.ndarray or cupy.ndarray): Initial data array.
+		device (int): device index for gpu and cpu(-1)
 	"""
 	def __init__(self, x, device=0):
 		super().__init__(device=device)
-		if not isinstance(type(x), np.ndarray) and isinstance(type(x), cp.ndarray):
-			raise ValueError("input x is neither numpy ndarray nor cupy ndarray, but {}".format(type(x)))
+		if not isinstance(type(x), (np.ndarray, cp.ndarray)):
+			raise TypeError("input x is neither numpy ndarray nor cupy ndarray, but {}".format(type(x)))
 		if self.device>-1:
 			self.data = cp.asarray(x)
 		elif self.device==-1:

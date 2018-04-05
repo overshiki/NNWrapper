@@ -13,9 +13,9 @@ except:
 
 
 
-from .tensor import device_guard, tensor
+from .tensor import device_guard, tensor, TensorBase
 
-from .basic import Variable, Parameter
+from .variable import Variable, Parameter, VarBase
 
 from .operation import operation
 
@@ -26,3 +26,8 @@ from .wrapper import wrapper
 
 from .nodes import *
 
+from .math.tensor_math import install_variable_arithmetics as iva_tensor
+from .math.variable_math import install_variable_arithmetics as iva_variable
+
+iva_tensor()
+iva_variable()

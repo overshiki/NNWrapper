@@ -1,28 +1,54 @@
-from CHAINER import tensor, np, cp
+from CHAINER import Variable, tensor, np, cp
 
 
 A = tensor(np.random.randn(4, 2), device=0)
 
-print(A.shape(), A.ndim())
+print(A.shape, A.ndim, A.dtype)
 
-# B = tensor(np.random.randn(4, 2), device=0)
+print(A+5)
+print(5+A)
+print(A)
+print(-A)
 
-# C = np.random.randn(4, 2)
+print(5*A)
+print(A*5)
 
-# D = cp.asarray(np.random.randn(4, 2))
+B = A/5.
+C = 5./A
 
-# E = 5
+print(B*C)
 
-# print(A+B, A-B, A*B, A**B, A>B, A>=B, A<B, A<=B, A==B, A!=B, A/B, A//B)
+print(A)
 
-# print("#"*164)
+print(abs(A))
 
-# print(A+C, A-C, A*C, A**C, A>C, A>=C, A<C, A<=C, A==C, A!=C, A/C, A//C)
+print(A**3)
 
-# print("#"*164)
+print(A==B, A!=B, A>=B, A<=B, A>B, A<B)
 
-# print(A+D, A-D, A*D, A**D, A>D, A>=D, A<D, A<=D, A==D, A!=D, A/D, A//D)
+print(type(A==B))
 
-# print("#"*164)
 
-# print(A+E, A-E, A*E, A**E, A>E, A>=E, A<E, A<=E, A==E, A!=E, A/E, A//E)
+A = Variable(tensor(np.random.randn(4, 2), device=0), device=0)
+
+print(A.shape, A.ndim, A.dtype)
+
+print(A+5)
+print(5+A)
+print(A)
+print(-A)
+
+print(5*A)
+print(A*5)
+
+B = A/5.
+C = 5./A
+
+print(B*C)
+
+print(A)
+
+print(abs(A))
+
+print(A**3)
+
