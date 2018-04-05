@@ -10,7 +10,7 @@ IN THIS MODULE, I JUST IMPLEMENT THE INFERENCE PART OF VINN WITH ONLY CUPY, I TH
 
 # from . import Variable, operation, Sigmoid, cp, np, F
 
-from . import Sigmoid, Graph, GraphList, np, cp, Variable, operation, device_guard, wrapper, Linear
+from . import Sigmoid, Graph, GraphList, np, cp, Variable, operation, device_guard, wrapper, Linear, tensor
 
 import math, re
 
@@ -124,7 +124,7 @@ class pooling(Graph):
 		# 	self.register_weights('weights', np.random.randn(param))
 		# else:
 		# 	self.register_weights('weights', param)
-		self.register_weights('weights', np.random.randn(param).astype(np.float32))
+		self.register_weights('weights', tensor(np.random.randn(param).astype(np.float32), device=self.device))
 
 		'''
 		this two with could be combined together
@@ -175,11 +175,12 @@ class pnn_layer(Graph):
 		for i in range(0, self.channel-self.dilation*self.size, self.stride):
 			INDEX.append([i+x*self.dilation for x in range(self.size)])
 
-		INDEX = self.op.array(INDEX)
+		INDEX = tensor(INDEX, device=self.device)
 		outputs = X.ndarray[INDEX.ndarray]
 		outputs = outputs.sum(axis=1)
 		#now is of F*N*S*k
 
+		outputs = tensor(outputs, device=self.device)
 		return outputs
 
 

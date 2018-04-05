@@ -2,7 +2,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 
-from . import np, cp, Variable, Parameter, operation, device_guard
+from . import np, cp, Variable, Parameter, operation, device_guard, tensor
 
 import re, copy
 
@@ -65,14 +65,14 @@ class Graph(node):
 
 	def register_weights(self, name, ndarray):
 		with self.init_scope():
-			if(type(ndarray)==self.op.arrayType):
+			if isinstance(ndarray, tensor):
+				if ndarray.device!=self.device:
+					ndarray = ndarray.to_device(self.device)
 				var = Parameter(ndarray, device=self.device).var
-			elif(type(ndarray)==chainer.Parameter):
+			elif isinstance(ndarray, chainer.Parameter):
 				var = ndarray
-			elif(type(ndarray)==self.op.counterType):
-				var = Parameter(ndarray, device=self.device).var
 			else:
-				raise ValueError("type of input parameters is neither {} nor {}, but {}".format(self.op.arrayType, "chainer.Parameter", type(ndarray)))
+				raise ValueError("type of input parameters is neither tensor nor chainer.Parameter, but {}".format(type(ndarray)))
 				
 			#in chainer's __setattr__, name is registrated into self._childern
 			setattr(self, name, var)
@@ -254,32 +254,6 @@ class GraphList(Graph):
 			yield prefix, child
 			for path, link in child.namednodes(True):
 				yield prefix + path, link
-
-
-# class Graph(node):
-# 	def __init__(self, device=0, link=False):
-# 		super().__init__(device=device)
-
-
-# 	def register_graphs(self, nodes_info):
-# 		'''
-# 		after this operation, all corresponding subgraphs, parameters are connected by self.subgraphs_dict and self.weights_dict, hierarchily
-# 		'''
-# 		with self.guard():
-# 			for key, name, data in nodes_info:
-# 				if(key=='graph'):
-# 					data.name = name
-# 					setattr(self, name, data)
-# 					# self.subgraphs_dict[name] = getattr(self, name) 
-# 					self.subgraphs_key.add(name)
-# 					# print(type(data))
-# 					# print(self._children)
-# 					# self.add_link(data)
-# 					# self._children.add(data)
-# 				elif(key=='weights'):
-# 					self.register_weights(name, data)
-
-
 
 
 

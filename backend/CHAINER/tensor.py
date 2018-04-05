@@ -152,8 +152,8 @@ class tensor(TensorBase):
 	"""
 	def __init__(self, x, device=0):
 		super().__init__(device=device)
-		if not isinstance(type(x), (np.ndarray, cp.ndarray)):
-			raise TypeError("input x is neither numpy ndarray nor cupy ndarray, but {}".format(type(x)))
+		if not isinstance(x, (np.ndarray, cp.ndarray, list)):
+			raise TypeError("input x is neither numpy ndarray nor cupy ndarray, nor list, but {}".format(type(x)))
 		if self.device>-1:
 			self.data = cp.asarray(x)
 		elif self.device==-1:

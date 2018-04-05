@@ -1,4 +1,4 @@
-from . import Variable, np, cp, operation
+from . import Variable, np, cp, operation, tensor
 import chainer
 
 
@@ -7,14 +7,22 @@ def wrapper(fun, device, *x, **kwargs):
 	op = operation(device=device)
 	_x = []
 	for i in x:
-		if(type(i)==Variable):
-			_x.append(i.var)
-		elif(type(i)==op.arrayType):
-			_x.append(chainer.Variable(i))
-		elif(type(i)==chainer.Variable):
+		if isinstance(i, tensor):
+			if device != i.device:
+				i.to_device(device)
+			_x.append(chainer.Variable(i.ndarray))
+
+		elif isinstance(i, (chainer.Variable, chainer.Parameter)):
+			#TODO:
+			# if device != i.device:
+			# 	i = i.to_gpu(device)
 			_x.append(i)
+		elif isinstance(i, Variable):
+			if device != i.device:
+				i = i.to_device(device)
+			_x.append(i.var)
 		else:
-			raise ValueError("type is not Variable nor cp.core.ndarray nor chainer.Variable, but to be {}".format(type(i)))
+			raise ValueError("input type is neither tensor, chainer.Variable, nor chainer.Parameter, but {}".format(type(i)))
 	return fun(*_x, **kwargs)
 
 

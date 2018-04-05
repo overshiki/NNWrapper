@@ -5,7 +5,6 @@ import chainer.functions as F
 class VarBase:
 	def __init__(self, device=0):
 		self.device = device
-		self.op = operation(device=self.device)
 		self.guard = device_guard(device=self.device)
 		self.guard.use()
 		self.var = None
@@ -35,7 +34,6 @@ class VarBase:
 
 	def to_device(self, device):
 		self.device = device 
-		self.op = operation(device=self.device)
 		self.guard = device_guard(device=self.device)
 		self.guard.use()
 		self.var.to_gpu(self.device)
@@ -99,7 +97,14 @@ class Variable(VarBase):
 			self.var = chainer.Variable(x.ndarray)
 
 		elif isinstance(x, (chainer.Variable, chainer.Parameter)):
+			#TODO:
+			# if self.device != x.device:
+			# 	x = x.to_gpu(self.device)
 			self.var = x
+		elif isinstance(x, VarBase):
+			if self.device != x.device:
+				x = x.to_device(self.device)
+			self.var = x.var
 		else:
 			raise ValueError("input type is neither tensor, chainer.Variable, nor chainer.Parameter, but {}".format(type(x)))
 

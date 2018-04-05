@@ -1,4 +1,4 @@
-from . import np, cp, tensor
+from . import np, cp, tensor, device_guard, Variable
 
 class operation:
 	def __init__(self, device=0):
@@ -23,6 +23,8 @@ class operation:
 		elif isinstance(x, (cp.ndarray, np.ndarray)):
 			#TODO, considering array in different gpus
 			_x = tensor(x, device=self.device).ndarray
+		elif isinstance(x, Variable):
+			_x = tensor(x.ndarray, device=self.device).ndarray
 		else:
 			raise TypeError("input type is neither tensor, nor cp.ndarray, np.ndarray, but {}".format(type(x)))
 		return _x
