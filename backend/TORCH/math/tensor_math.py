@@ -1,12 +1,9 @@
-from .. import TensorBase, np, cp, device_guard
-from ..tensor import device_guard_decorator
+from .. import TensorBase, np
 
 def type_check(self, other):
 	number_check = False
 	if isinstance(other, TensorBase):
 		var = other
-	elif isinstance(other, (np.ndarray, cp.ndarray)):
-		var = self.new(other, device=self.device)
 	elif np.isscalar(other):
 		var = other
 		number_check = True
@@ -20,7 +17,7 @@ def type_check(self, other):
 	else:
 		return var
 
-@device_guard_decorator
+# @device_guard_decorator
 def add(self, rhs):  # lhs + rhs
 	"""Element-wise addition.
 	Returns:
@@ -29,7 +26,7 @@ def add(self, rhs):  # lhs + rhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray + var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def neg(self): #-x
 	"""Element-wise negation.
 	Returns:
@@ -37,7 +34,7 @@ def neg(self): #-x
 	"""	
 	return self.new((-1)*self.ndarray, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def sub(self, rhs):  # lhs - rhs
 	"""Element-wise subtraction.
 	Returns:
@@ -46,7 +43,7 @@ def sub(self, rhs):  # lhs - rhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray - var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def rsub(self, rhs): # rhs - lhs 
 	"""Element-wise subtraction.
 	Returns:
@@ -54,7 +51,7 @@ def rsub(self, rhs): # rhs - lhs
 	"""
 	return self.__neg__().__add__(rhs)
 
-@device_guard_decorator
+# @device_guard_decorator
 def mul(self, rhs):  # lhs * rhs
 	"""Element-wise multiplication.
 	Returns:
@@ -63,7 +60,7 @@ def mul(self, rhs):  # lhs * rhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray * var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def div(self, rhs):  # lhs / rhs
 	"""Element-wise division.
 	Returns:
@@ -72,7 +69,7 @@ def div(self, rhs):  # lhs / rhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray / var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def pow(self, rhs):  # lhs ** rhs
 	"""Element-wise power function.
 	Returns:
@@ -81,7 +78,7 @@ def pow(self, rhs):  # lhs ** rhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray ** var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def rpow(self, rhs):  # rhs ** lhs
 	"""Element-wise power function.
 	Returns:
@@ -95,7 +92,7 @@ def rpow(self, rhs):  # rhs ** lhs
 			var = cp.asarray(np.array([var]))
 	return self.new(var ** self.ndarray, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def rdiv(self, rhs):  # rhs / lhs
 	"""Element-wise division.
 	Returns:
@@ -104,7 +101,7 @@ def rdiv(self, rhs):  # rhs / lhs
 	var = self.type_check(rhs)
 	return self.new(var*(self.ndarray**-1), device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def rdiv(self, rhs):  # rhs / lhs
 	"""Element-wise division.
 	Returns:
@@ -113,15 +110,15 @@ def rdiv(self, rhs):  # rhs / lhs
 	var = self.type_check(rhs)
 	return self.new(var*(self.ndarray**-1), device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def absolute(self):  # abs(x)
 	"""Element-wise absolute.
 	Returns:
 		tensor: Output tensor.
 	"""
-	return self.new(abs(self.ndarray), device=self.device)
+	return self.new(self.ndarray.abs(), device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def eq(self, rhs):  # rhs == lhs
 	"""Element-wise equal.
 	Returns:
@@ -130,7 +127,7 @@ def eq(self, rhs):  # rhs == lhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray == var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def lt(self, rhs):  # rhs < lhs
 	"""Element-wise less than.
 	Returns:
@@ -139,7 +136,7 @@ def lt(self, rhs):  # rhs < lhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray < var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def le(self, rhs):  # rhs <= lhs
 	"""Element-wise less equal.
 	Returns:
@@ -148,7 +145,7 @@ def le(self, rhs):  # rhs <= lhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray <= var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def gt(self, rhs):  # rhs > lhs
 	"""Element-wise greater than.
 	Returns:
@@ -157,7 +154,7 @@ def gt(self, rhs):  # rhs > lhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray > var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def ge(self, rhs):  # rhs >= lhs
 	"""Element-wise greater than.
 	Returns:
@@ -166,7 +163,7 @@ def ge(self, rhs):  # rhs >= lhs
 	var = self.type_check(rhs)
 	return self.new(self.ndarray >= var, device=self.device)
 
-@device_guard_decorator
+# @device_guard_decorator
 def ne(self, rhs):  # rhs != lhs
 	"""Element-wise not equal.
 	Returns:

@@ -1,8 +1,6 @@
 import torch
-import chainer.functions as F
-import chainer.links as L
 
-from . import np, cp, Variable, operation
+from . import np, Variable, operation
 
 import re, copy
 
@@ -78,77 +76,111 @@ class Graph(node):
 		# for param in super().params(include_uninit):
 		# 	yield param
 
-		d = self.__dict__
-		for name in self._params:
-			if include_uninit or d[name].data is not None:
-				yield d[name]
-
-		d = self.__dict__
-		for name in self._children:
-			for param in d[name].params(include_uninit):
-				yield param
+		for name, param in self.namedparams():
+			yield param
 
 
-	def namedparams(self, include_uninit=True):
-		# for ret in super().namedparams(include_uninit):
-		# 	yield ret
-		d = self.__dict__
-		for name in self._params:
-			if include_uninit or d[name].data is not None:
-				yield '/' + name, d[name]
+	def namedparams(self, memo=None, prefix='/'):
 
-		for name in self._children:
-			prefix = '/' + name
-			for path, param in d[name].namedparams(include_uninit):
-				yield prefix + path, param
+		#compared that in chainer, the pytorch version use memo set to manage the visited names, this may not be neccessary since parameters of the child module is always different from that from root modules
+		#in chainer, self._params is a list contains the name of the parameters, while the paramters are in self.__dict__ through setattr, getattr method
+		#while in pytorch, self._parameters is dict contains both name and paramters
+
+		#similarly, in chainer, self._children is a list contains the name of the child modules, while the child modules are in self.__dict__ through setattr, getattr method
+		#while in pytorch, self._modules is dict contains both name and child module
+
+		#in our wrapper implementation here, we follow the pytorch version, while in our chainer wrapper we follow chainer version instead. This will make our wrapper fit the two framework better
+		if memo is None:
+			memo = set()
+		for name, p in self._parameters.items():
+			if p is not None and p not in memo:
+				memo.add(p)
+				yield prefix + '/' + name, p
+		for mname, _node in self.named_children():
+			submodule_prefix = prefix + '/' + mname
+
+			if isinstance(_node, node):
+				#if node is NNWrapper node
+				for name, p in _node.namedparams(memo, submodule_prefix):
+					yield name.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
+			elif isinstance(_node, torch.nn.Module):
+				#if node is pytorch module
+				for name, p in _node.named_parameters(memo, submodule_prefix):
+					yield name.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
+			else:
+				raise TypeError("node is neighter node type nor torch.nn.Module type")
+
+		#this is a recursive approach, since for every named_childern loop, there is a namedparams call, which will resulting a recursive all of named_children
+		#this means named_children should just return immediate childern nodes
+
+
+	def named_children(self):
+		#unique in pytorch version, return immediate childern nodes
+		memo = set()
+		for name, module in self._modules.items():
+			if module is not None and module not in memo:
+				memo.add(module)
+				yield name, module 
+
 
 	def namednodes(self, skipself=False):
-		'''
+		'''An iterator over all children modules of the network
 		if the child type is node, then will be ok
 		but if the child is with type link, will cause problem
 
 		TODO: here we need a better way to wrap link into node
 		'''
+		#for pytorch, it seems Returns an iterator over immediate children modules
 		if not skipself:
 			yield '/', self
-		d = self.__dict__
-		for name in self._children:
-			child = d[name]
-			prefix = '/' + name
-			yield prefix, child
-			if issubclass(type(d[name]), node):
-				for path, _node in d[name].namednodes(True):
-					yield prefix + path, _node
+		memo = set()
+		for name, module in self._modules.items():
+			if module is not None and module not in memo:
+				memo.add(module)
+				yield name, module
+				if isinstance(module, node):
+					for path, submodule in module.namednodes():
+						yield path, submodule
 
-			elif isinstance(d[name], chainer.Link):
-				#type guard here, if it is leaf node, then it may be chainer link type
-				for path, link in d[name].namedlinks(True):
-					yield prefix + path, link
+				elif isinstance(module, torch.nn.Module):
+					for path, submodule in module.named_modules(memo=memo, prefix='/'):
+						yield path, submodule				
 
 
-	def register_weights(self, name, param):
 
-        if '_parameters' not in self.__dict__:
-            raise AttributeError(
-                "cannot assign parameter before Module.__init__() call")
+	def register_weights(self, name, ndarray):
 
-        if hasattr(self, name) and name not in self._parameters:
-            raise KeyError("attribute '{}' already exists".format(name))
+		if isinstance(ndarray, tensor):
+			if ndarray.device!=self.device:
+				ndarray = ndarray.to_device(self.device)
+			param = Parameter(ndarray, device=self.device).var
+		elif isinstance(ndarray, torch.nn.Parameter):
+			param = ndarray
+		else:
+			raise ValueError("type of input parameters is neither tensor nor torch.nn.Parameter, but {}".format(type(ndarray)))
 
-        if param is None:
-            self._parameters[name] = None
-        elif not isinstance(param, Parameter):
-            raise TypeError("cannot assign '{}' object to parameter '{}' "
-                            "(torch.nn.Parameter or None required)"
-                            .format(torch.typename(param), name))
-        elif param.grad_fn:
-            raise ValueError(
-                "Cannot assign non-leaf Variable to parameter '{0}'. Model "
-                "parameters must be created explicitly. To express '{0}' "
-                "as a function of another variable, compute the value in "
-                "the forward() method.".format(name))
-        else:
-            self._parameters[name] = param
+		self.register_parameter(name, param) #inherited from torch.nn.Module
+		# if '_parameters' not in self.__dict__:
+		# 	raise AttributeError(
+		# 		"cannot assign parameter before Module.__init__() call")
+
+		# if hasattr(self, name) and name not in self._parameters:
+		# 	raise KeyError("attribute '{}' already exists".format(name))
+
+		# if param is None:
+		# 	self._parameters[name] = None
+		# elif not isinstance(param, torch.nn.Parameter):
+		# 	raise TypeError("cannot assign '{}' object to parameter '{}' "
+		# 					"(torch.nn.Parameter or None required)"
+		# 					.format(torch.typename(param), name))
+		# elif param.grad_fn:
+		# 	raise ValueError(
+		# 		"Cannot assign non-leaf Variable to parameter '{0}'. Model "
+		# 		"parameters must be created explicitly. To express '{0}' "
+		# 		"as a function of another variable, compute the value in "
+		# 		"the forward() method.".format(name))
+		# else:
+		# 	self._parameters[name] = param
 
 
 
@@ -157,12 +189,12 @@ class Graph(node):
 		'''
 		for pytorch, module are registrated in self._modules and can be accessed through __getattr__
 		'''
-        if not isinstance(_node, torch.nn.Module) and not isinstance(_node, node) and module is not None:
-            raise TypeError('cannot register a non-Node object as a child')
-        if hasattr(self, name) and name not in self._modules:
-            raise AttributeError(
+		if not isinstance(_node, torch.nn.Module) and not isinstance(_node, node) and module is not None:
+			raise TypeError('cannot register a non-Node object as a child')
+		if hasattr(self, name) and name not in self._modules:
+			raise AttributeError(
 				'cannot register a new node %s: attribute exists' % name)
-        self._modules[name] = _node
+		self._modules[name] = _node
 
 
 class GraphList(Graph):
