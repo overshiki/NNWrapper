@@ -2,11 +2,11 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 
-from . import np, cp, Variable, Parameter, operation, device_guard, tensor
+from . import np, cp, Variable, Parameter, operation, device_guard, tensor, base
 
 import re, copy
 
-class node(chainer.Chain):
+class node(chainer.Chain, base):
 	def __init__(self,):
 		super().__init__()
 
@@ -17,7 +17,6 @@ class Graph(node):
 
 		self.device = device
 		self.link = link
-		self.op = operation(device=self.device)
 
 		# self.weights_key = set()
 		# self.subgraphs_key = set()
@@ -68,14 +67,17 @@ class Graph(node):
 			if isinstance(ndarray, tensor):
 				if ndarray.device!=self.device:
 					ndarray = ndarray.to_device(self.device)
-				var = Parameter(ndarray, device=self.device).var
+				param = Parameter(ndarray, device=self.device).var
+			elif isinstance(ndarray, np.ndarray):
+				ndarray = tensor(ndarray, device=self.device)
+				param = Parameter(ndarray, device=self.device).var
 			elif isinstance(ndarray, chainer.Parameter):
-				var = ndarray
+				param = ndarray
 			else:
 				raise ValueError("type of input parameters is neither tensor nor chainer.Parameter, but {}".format(type(ndarray)))
 				
 			#in chainer's __setattr__, name is registrated into self._childern
-			setattr(self, name, var)
+			setattr(self, name, param)
 
 	def get_grad_dict(self, cpu=True):
 		grad_dict = {}
@@ -102,18 +104,72 @@ class Graph(node):
 				yield param
 
 
+	def paramNameIn(self, param_name):
+		r'''guard the parameter names, transfer them to the syntax the current backend support
+		'''
+		#convert .leafBias to .layer.bias
+		#convert .leafWeights to .layer.weights
+		param_name = param_name.split(".")
+		if param_name[-1]=="leafBias":
+			param_name[-1] = "layer/b"
+		elif param_name[-1]=="leafWeight":
+			param_name[-1] = "layer/W"
+		param_name = ".".join(param_name)
+		return param_name
+
+	def paramNameOut(self, param_name):
+		r'''guard the parameter names, transfer them to the syntax the current backend support
+		'''
+		#convert .layer.bias to .leafBias 
+		#convert .layer.weigth to .leafWeights 
+		param_name = param_name.split(".")
+		if param_name[-1]=="layer/b":
+			param_name[-1] = "leafBias"
+		elif param_name[-1]=="layer/W":
+			param_name[-1] = "leafWeight"
+		param_name = ".".join(param_name)
+		return param_name
+
+
 	def namedparams(self, include_uninit=True):
 		# for ret in super().namedparams(include_uninit):
 		# 	yield ret
 		d = self.__dict__
 		for name in self._params:
 			if include_uninit or d[name].data is not None:
-				yield '/' + name, d[name]
+				yield '.' + name, d[name]
 
 		for name in self._children:
-			prefix = '/' + name
+			prefix = '.' + name
 			for path, param in d[name].namedparams(include_uninit):
 				yield prefix + path, param
+
+	def params_to_dict(self):
+		_dict = {}
+		for name, param in self.namedparamsOut():
+			_dict[name] = Parameter(param).numpy()
+		return _dict
+
+	def params_from_dict(self, name):
+		# param_dict = self.load_params(name)
+		# for key, param_data in self.namedparamsIn(param_dict):
+		# 	print(key)
+		# 	getattr(self, key).copydata(Variable(param_data, device=self.device).var)
+
+
+		memo = set()
+		all_memo = set()
+		param_dict = self.load_params(name)
+		for key, param_data in self.namedparamsIn(param_dict):
+			for name, param in self.namedparams():
+				if name==key and key not in memo:
+					param.copydata(Variable(param_data, device=self.device).var)	
+					memo.add(key)
+			all_memo.add(key)
+		if len(all_memo)!=len(memo):
+			raise ValueError("not all params from dict are registered")
+
+
 
 	def namednodes(self, skipself=False):
 		'''
@@ -123,11 +179,11 @@ class Graph(node):
 		TODO: here we need a better way to wrap link into node
 		'''
 		if not skipself:
-			yield '/', self
+			yield '.', self
 		d = self.__dict__
 		for name in self._children:
 			child = d[name]
-			prefix = '/' + name
+			prefix = '.' + name
 			yield prefix, child
 			if issubclass(type(d[name]), node):
 				for path, _node in d[name].namednodes(True):

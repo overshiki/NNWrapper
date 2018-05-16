@@ -1,6 +1,6 @@
 # from CHAINER import Variable, tensor, np, cp
 
-from TORCH import tensor, np
+from TORCH import tensor, np, Variable
 
 
 A = tensor(np.random.randn(4, 2), device=0)
@@ -31,27 +31,37 @@ print(A==B, A!=B, A>=B, A<=B, A>B, A<B)
 
 print(type(A==B))
 
+import copy
+print(copy.copy(A))
+print(copy.deepcopy(A))
 
-# A = Variable(tensor(np.random.randn(4, 2), device=0), device=0)
+print(A.astype('int16'))
 
-# print(A.shape, A.ndim, A.dtype)
+A = Variable(tensor(np.random.randn(4, 2), device=0), device=0)
 
-# print(A+5)
-# print(5+A)
-# print(A)
-# print(-A)
+print(A.shape, A.ndim, A.dtype)
 
-# print(5*A)
-# print(A*5)
+print(A+5)
+print(5+A)
+print(A)
+print(-A)
 
-# B = A/5.
-# C = 5./A
+print(5*A)
+print(A*5)
 
-# print(B*C)
+B = A/5.
+C = 5./A
 
-# print(A)
+print(B*C)
 
-# print(abs(A))
+print(A)
 
-# print(A**3)
+print(abs(A))
 
+print(A**3)
+
+import copy
+print(copy.copy(A))
+print(copy.deepcopy(A))
+
+print(A.astype('int16'))

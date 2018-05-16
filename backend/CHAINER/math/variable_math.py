@@ -1,7 +1,9 @@
 from .. import tensor, VarBase, np, cp, device_guard
+import chainer
 
 def type_check(self, other):
 	number_check = False
+	variable_check = False
 	if isinstance(other, VarBase):
 		var = other
 	elif isinstance(other, tensor):
@@ -10,13 +12,21 @@ def type_check(self, other):
 	elif np.isscalar(other):
 		var = other
 		number_check = True
+	elif isinstance(other, (chainer.Variable, chainer.Parameter)):
+		if self.var.ndim!=other.ndim:
+			self.var, var = chainer.functions.broadcast(self.var, other)
+		variable_check = True
 	else:
 		raise TypeError("input other is not VarBase nor tensor nor scalar variable, but to be: {}".format(type(other)))
 
 	if number_check==False:
-		if var.device!=self.device:
-			var.to_device(self.device)
-		return var.var
+		if variable_check==False:
+			if var.device!=self.device:
+				var.to_device(self.device)
+			return var.var
+		else:
+			return var 
+			#TODO: device transfer
 	else:
 		return var
 

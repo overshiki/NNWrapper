@@ -1,10 +1,10 @@
 import torch
 
-from . import np, Variable, operation
+from . import np, Parameter, Variable, tensor, base
 
 import re, copy
 
-class node(torch.nn.Module):
+class node(torch.nn.Module, base):
 	def __init__(self,):
 		super().__init__()
 
@@ -15,7 +15,6 @@ class Graph(node):
 
 		self.device = device
 		self.link = link
-		self.op = operation(device=self.device)
 
 		# self.weights_key = set()
 		# self.subgraphs_key = set()
@@ -34,20 +33,11 @@ class Graph(node):
 		pass
 
 	def __call__(self, *args, **kwargs):
-		if self.device!=-1:
-			with self.gpu():
-				if(self.link==False):
-					args = tuple(map(lambda i:Variable(i, device=self.device), args))
-				else:
-					args = tuple(map(lambda i:Variable(i, device=self.device).var, args))
-				return self.forward(*args, **kwargs)
+		if(self.link==False):
+			args = tuple(map(lambda i:Variable(i, device=self.device), args))
 		else:
-
-			if(self.link==False):
-				args = tuple(map(lambda i:Variable(i, device=self.device), args))
-			else:
-				args = tuple(map(lambda i:Variable(i, device=self.device).var, args))
-			return self.forward(*args, **kwargs)
+			args = tuple(map(lambda i:Variable(i, device=self.device).var, args))
+		return self.forward(*args, **kwargs)
 
 
 	def to_gpu(self, device):
@@ -55,11 +45,7 @@ class Graph(node):
 		TODO: with problem
 		'''
 		self.device = device 
-		self.op = operation(device=self.device)
-		super().to_gpu(device)
-
-	def gpu(self):
-		return cp.cuda.Device(self.device)
+		super().cuda(device)
 
 
 	def get_grad_dict(self, cpu=True):
@@ -79,40 +65,91 @@ class Graph(node):
 		for name, param in self.namedparams():
 			yield param
 
+	def paramNameIn(self, param_name):
+		r'''guard the parameter names, transfer them to the syntax the current backend support
+		'''
+		#convert .leafBias to .layer.bias
+		#convert .leafWeights to .layer.weights
+		param_name = param_name.split(".")
+		if param_name[-1]=="leafBias":
+			param_name[-1] = "layer.bias"
+		elif param_name[-1]=="leafWeight":
+			param_name[-1] = "layer.weight"
+		param_name = ".".join(param_name)
+		return param_name
 
-	def namedparams(self, memo=None, prefix='/'):
+	def paramNameOut(self, param_name):
+		r'''guard the parameter names, transfer them to the syntax the current backend support
+		'''
+		#convert .layer.bias to .leafBias 
+		#convert .layer.weigth to .leafWeights 
+		param_name = param_name.split(".")
+		if param_name[-1]=="bias" and param_name[-2]=="layer":
+			param_name.pop(-1)
+			param_name[-1] = "leafBias"
+		elif param_name[-1]=="weight" and param_name[-2]=="layer":
+			param_name.pop(-1)
+			param_name[-1] = "leafWeight"
+		param_name = ".".join(param_name)
+		return param_name
 
-		#compared that in chainer, the pytorch version use memo set to manage the visited names, this may not be neccessary since parameters of the child module is always different from that from root modules
-		#in chainer, self._params is a list contains the name of the parameters, while the paramters are in self.__dict__ through setattr, getattr method
-		#while in pytorch, self._parameters is dict contains both name and paramters
 
-		#similarly, in chainer, self._children is a list contains the name of the child modules, while the child modules are in self.__dict__ through setattr, getattr method
+	def namedparams(self, memo=None, prefix=''):
+		r'''
+		compared that in chainer, the pytorch version use memo set to manage the visited names, this may not be neccessary since parameters of the child module is always different from that from root modules
+
+		in chainer, self._params is a list contains the name of the parameters, while the paramters are in self.__dict__ through setattr, getattr method
+		while in pytorch, self._parameters is dict contains both name and paramters
+
+		similarly, in chainer, self._children is a list contains the name of the child modules, while the child modules are in self.__dict__ through setattr, getattr method
 		#while in pytorch, self._modules is dict contains both name and child module
 
-		#in our wrapper implementation here, we follow the pytorch version, while in our chainer wrapper we follow chainer version instead. This will make our wrapper fit the two framework better
+		in our wrapper implementation here, we follow the pytorch version, while in our chainer wrapper we follow chainer version instead. This will make our wrapper fit the two framworks better
+
+		#TODO: better name string, it is important since we need to give the same paramter the same name for all kinds of backend
+		'''
 		if memo is None:
 			memo = set()
 		for name, p in self._parameters.items():
 			if p is not None and p not in memo:
 				memo.add(p)
-				yield prefix + '/' + name, p
+				yield prefix + '.' + name, p
 		for mname, _node in self.named_children():
-			submodule_prefix = prefix + '/' + mname
+			submodule_prefix = prefix + '.' + mname
 
 			if isinstance(_node, node):
 				#if node is NNWrapper node
 				for name, p in _node.namedparams(memo, submodule_prefix):
-					yield name.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
+					yield name, p #.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
 			elif isinstance(_node, torch.nn.Module):
 				#if node is pytorch module
 				for name, p in _node.named_parameters(memo, submodule_prefix):
-					yield name.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
+					yield name, p #.replace(".", "/"), p #replace "." with "/" so that match our parameter name format
 			else:
 				raise TypeError("node is neighter node type nor torch.nn.Module type")
 
-		#this is a recursive approach, since for every named_childern loop, there is a namedparams call, which will resulting a recursive all of named_children
-		#this means named_children should just return immediate childern nodes
+		r'''this is a recursive approach, since for every named_childern loop, there is a namedparams call, which will resulting a recursive call of named_children
+		this means named_children should just return immediate childern nodes
+		'''
 
+	def params_to_dict(self):
+		_dict = {}
+		for name, param in self.namedparamsOut():
+			_dict[name] = Parameter(param).numpy()
+		return _dict
+
+	def params_from_dict(self, name):
+		memo = set()
+		all_memo = set()
+		param_dict = self.load_params(name)
+		for key, param_data in self.namedparamsIn(param_dict):
+			for name, param in self.namedparams():
+				if name==key and key not in memo:
+					param.data = tensor(param_data, device=self.device).var	
+					memo.add(key)
+			all_memo.add(key)
+		if len(all_memo)!=len(memo):
+			raise ValueError("not all params from dict are registered")
 
 	def named_children(self):
 		#unique in pytorch version, return immediate childern nodes
@@ -128,7 +165,7 @@ class Graph(node):
 		if the child type is node, then will be ok
 		but if the child is with type link, will cause problem
 
-		TODO: here we need a better way to wrap link into node
+		TODO: better name string
 		'''
 		#for pytorch, it seems Returns an iterator over immediate children modules
 		if not skipself:
@@ -153,6 +190,9 @@ class Graph(node):
 		if isinstance(ndarray, tensor):
 			if ndarray.device!=self.device:
 				ndarray = ndarray.to_device(self.device)
+			param = Parameter(ndarray, device=self.device).var
+		elif isinstance(ndarray, np.ndarray):
+			ndarray = tensor(ndarray, device=self.device)
 			param = Parameter(ndarray, device=self.device).var
 		elif isinstance(ndarray, torch.nn.Parameter):
 			param = ndarray
@@ -189,7 +229,7 @@ class Graph(node):
 		'''
 		for pytorch, module are registrated in self._modules and can be accessed through __getattr__
 		'''
-		if not isinstance(_node, torch.nn.Module) and not isinstance(_node, node) and module is not None:
+		if not isinstance(_node, (torch.nn.Module, node)) and _node is not None:
 			raise TypeError('cannot register a non-Node object as a child')
 		if hasattr(self, name) and name not in self._modules:
 			raise AttributeError(
@@ -197,20 +237,40 @@ class Graph(node):
 		self._modules[name] = _node
 
 
+	def cleargrads(self):
+		r"""just wrapper for zero_grad method, so that match the name of other backends
+		"""
+		self.zero_grad()
+
+
+
+
+import operator
 class GraphList(Graph):
 	def __init__(self, *nodes):
+		r"""
+		redefined self._modules and self._parameters so that support list append and getitem operation
+		initially, self._modules and self._parameters is ordered dict, with key to be the name of the module or parameter
+		"""
 		super().__init__()
-		self._children = []
+		# self._children = []
 
 		for node in nodes:
-			self.add_node(node)
+			# self.add_node(node)
+			self.append(node)
 
-	def __setattr__(self, name, value):
-		if self.within_init_scope and (isinstance(value, chainer.Link) or (isinstance(value, node))):
-			raise TypeError(
-				'cannot register a new node'
-				' within a "with chainlist.init_scope():" block.')
-		super().__setattr__(name, value)
+	# def __setattr__(self, idx, value):
+	# 	idx = operator.index(idx)
+	# 	return setattr(self, str(idx), module)
+
+	def _get_abs_string_index(self, idx):
+		"""Get the absolute index for the list of modules"""
+		idx = operator.index(idx)
+		if not (-len(self) <= idx < len(self)):
+			raise IndexError('index {} is out of range'.format(idx))
+		if idx < 0:
+			idx += len(self)
+		return str(idx)
 
 	def __getitem__(self, index):
 		"""Returns the child at given index.
@@ -219,14 +279,17 @@ class GraphList(Graph):
 		Returns:
 			Link: The ``index``-th child link.
 		"""
-		return self._children[index]
+		if isinstance(idx, slice):
+			return GraphList(list(self._modules.values())[idx])
+		else:
+			return self._modules[self._get_abs_string_index(idx)]
 
 	def __iter__(self):
-		return iter(self._children)
+		return iter(self._modules.values())
 
 	def __len__(self):
 		"""Returns the number of children."""
-		return len(self._children)
+		return len(self._modules)
 
 	def append(self, node):
 		"""Registers a child link and adds it to the tail of the list.
@@ -235,15 +298,17 @@ class GraphList(Graph):
 		Args:
 			link (Link): The link object to be regsitered.
 		"""
-		self.add_node(node)
+		# self.add_node(node)
+		self.add_node(str(len(self)), node)
+		return self
 
-	def add_node(self, node):
-		"""Registers a child link and adds it to the tail of the list.
-		Args:
-			link (Link): The link object to be registered.
-		"""
-		node.name = str(len(self._children))
-		self._children.append(node)
+	# def add_node(self, node):
+	# 	"""Registers a child link and adds it to the tail of the list.
+	# 	Args:
+	# 		link (Link): The link object to be registered.
+	# 	"""
+	# 	node.name = str(len(self._children))
+	# 	self._children.append(node)
 
 	# def copy(self):
 	#     ret = super(ChainList, self).copy()

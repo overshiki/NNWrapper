@@ -1,5 +1,5 @@
 from . import np, tensor, device_guard, Variable, _OperationBase
-import chainer
+import torch
 
 r"""we consider using two type of operation, operation for tensor and operation for variable, since for many framwork, this two operations are different. 
 For some framwork such as pytorch, Variable is actually the same type as tensor, thus this two operations should be exactly the same
@@ -8,25 +8,18 @@ class OperationBase(_OperationBase):
 	def __init__(self, OpType=tensor, VarType=np.ndarray, device=0):
 		super().__init__(OpType=OpType, VarType=VarType, device=device)
 
-
 		self.run = np #we may not want to see run object anymore
 
 		self.newaxis = self.run.newaxis #this currently only support numpy and cupy, we will consider enable this syntax for pytorch in the near future
 
+	def __str__(self):
+		return "operation on device: {}".format(self.device)
 
 
-
-	def transpose(self, x, **kwargs):		
-		_x = self.unskin_element(x)
-		return self.type(self.run.transpose(_x, **kwargs), device=self.device)
 
 	def concatenate(self, x, **kwargs):		
 		_x = self.unskin(x)
-		return self.type(self.run.concatenate(_x, **kwargs), device=self.device)
-
-	def max(self, *x, **kwargs):		
-		_x = self.unskin(x)
-		return self.type(self.run.max(*_x, **kwargs), device=self.device)
+		return self.type(self.run.cat(_x, **kwargs), device=self.device)
 
 	def argmax(self, *x, **kwargs):		
 		_x = self.unskin(x)
@@ -84,16 +77,10 @@ class OperationBase(_OperationBase):
 class TensorOperation(OperationBase):
 	def __init__(self, device=0):
 		super().__init__(OpType=tensor, device=device)
-		if self.device==-1:
-			self.run = np
-			self.VarType = np.ndarray 
-		else:
-			self.run = cp
-			self.VarType = cp.ndarray
-
+		self.run = torch
 
 class VariableOperation(OperationBase):
 	def __init__(self, device=0):
-		super().__init__(OpType=Variable, VarType=chainer.Variable, device=device)
-		self.run = chainer.functions
+		super().__init__(OpType=Variable, device=device)
+		self.run = torch
 

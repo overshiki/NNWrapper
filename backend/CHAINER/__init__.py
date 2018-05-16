@@ -1,4 +1,7 @@
 import numpy as np
+
+import chainer
+
 class empty:
 	def __init__(self, ):
 		self.core = self
@@ -11,13 +14,20 @@ except:
 	cp = empty()
 	pass
 
+from .loss import *
+from .optimize import *
 
+from ..base import base
 
-from .tensor import device_guard, tensor, TensorBase
+from ..operation import _OperationBase
 
-from .variable import Variable, Parameter, VarBase
+from .tensor import device_guard, TensorBase
 
-from .operation import operation
+from .variable import VarBase
+
+from .basic import Variable, Parameter, tensor
+
+from .operation import TensorOperation, VariableOperation
 
 from .pool import task_parallel
 

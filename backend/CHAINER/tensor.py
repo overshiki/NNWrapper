@@ -29,6 +29,7 @@ def device_guard_decorator(fun):
 		with self.guard:
 			return fun(self, *x, **kwargs)
 	return guard_fun
+	#TODO: replace 'with' closure with decorator totally, since it is more compacitble with code for other backend
 
 
 class TensorBase:
@@ -101,7 +102,7 @@ class TensorBase:
 
 	@device_guard_decorator
 	def cast(self, dtype):
-		self.data = self.ndarray.astype(dtype)
+		self.data = self.data.astype(dtype)
 
 	@device_guard_decorator
 	def astype(self, dtype):
@@ -137,43 +138,6 @@ class TensorBase:
 		return result
 
 
-
-class tensor(TensorBase):
-	r"""implementation of tensor data structure
-
-    .. note::
-        The following operators are defined for variable(s).
-        * Indexing: ``a[slices]`` (:meth:`__getitem__`)
-        * Addition: ``a + b`` (:meth:`__add__`, :meth:`__radd__`)
-        * Subtraction: ``a - b`` (:meth:`__sub__`, :meth:`__rsub__`)
-        * Multiplication: ``a * b`` (:meth:`__mul__`, :meth:`__rmul__`)
-        * Division: ``a / b`` (:meth:`__div__`, :meth:`__rdiv__`, \
-                               :meth:`__truediv__`, :meth:`__rtruediv__`)
-        * Floor Division: ``a // b`` (:meth:`__floordiv__`, \
-                                      :meth:`__rfloordiv__`)
-        * Exponentiation: ``a ** b`` (:meth:`__pow__`, :meth:`__rpow__`)
-        * Matirx Multiplication: ``a @ b`` (:meth:`__matmul__`, \
-                                            :meth:`__rmatmul__`)
-        * Negation (Arithmetic): ``- a`` (:meth:`__neg__`)
-
-    Args:
-        x (numpy.ndarray or cupy.ndarray): Initial data array.
-		device (int): device index for gpu and cpu(-1)
-	"""
-	def __init__(self, x, device=0):
-		super().__init__(device=device)
-		with self.guard:
-			if not isinstance(x, (np.ndarray, cp.ndarray, list)):
-				raise TypeError("input x is neither numpy ndarray nor cupy ndarray, nor list, but {}".format(type(x)))
-			if self.device>-1:
-				self.data = cp.asarray(x)
-			elif self.device==-1:
-				if isinstance(x, np.ndarray):
-					self.data = x
-				elif isinstance(x, cp.ndarray):
-					self.data = x.get()
-			else:
-				raise ValueError("invalid device setting, current device is {}".format(self.device))
 
 
 TensorBase.device_guard_decorator = device_guard_decorator

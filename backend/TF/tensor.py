@@ -1,4 +1,4 @@
-import torch
+import tensorflow as tf
 import numpy as np
 
 class device_guard:
@@ -187,12 +187,19 @@ class tensor(TensorBase):
     Args:
         x torch.tensor: Initial data array.
 		device (int): device index for gpu and cpu(-1)
-		TODO: support dtype check for list, so that enable list as input
+		TODO:
+		tensorflow have following tensor types:
+			tf.Variable
+			tf.constant
+			tf.placeholder
+			tf.SparseTensor
+		here we need to wrap tf.placeholder and tf.constant into tensor type
+		and then wrap tf.Variable into Variable type
 	"""
 	def __init__(self, x, device=0):
 		super().__init__(device=device)
 		if self.device>-1:
-			if isinstance(x, torch._TensorBase):
+			if isinstance(x, tf.Tensor):
 				if self.device>-1:
 					self.data = x.cuda(self.device) 
 				else:

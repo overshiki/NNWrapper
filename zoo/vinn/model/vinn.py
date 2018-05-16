@@ -10,7 +10,7 @@ IN THIS MODULE, I JUST IMPLEMENT THE INFERENCE PART OF VINN WITH ONLY CUPY, I TH
 
 # from . import Variable, operation, Sigmoid, cp, np, F
 
-from . import Sigmoid, Graph, GraphList, np, cp, Variable, operation, device_guard, wrapper, Linear, tensor
+from . import Sigmoid, Graph, GraphList, np, Variable, operation, device_guard, wrapper, Linear, tensor, VariableOperation
 
 import math, re
 
@@ -28,7 +28,7 @@ class model(Graph):
 		super().__init__(device=device)
 		self.device = device
 		self.checkPath = checkPath
-		self.link = True
+		self.link = False
 
 		size_min, size_max, size_step = design['size_min'], design['size_max'], design['size_step']
 		stride_min, stride_max, stride_step = design['stride_min'], design['stride_max'], design['stride_step']
@@ -66,11 +66,13 @@ class model(Graph):
 
 		# for index, pool in enumerate(self.pooling):
 		# 	self.add_node('pool'+str(index), pool)
+		self.op = VariableOperation(device=self.device)
 
 
 	def forward(self, x):
 		# print("vinn start")
 		#embedding and change to C*N*S*k
+		print(type(x))
 		x = x.transpose([1,0,2,3])
 		# x = chainer.functions.transpose(x, axes=[1,0,2,3])
 
@@ -87,8 +89,10 @@ class model(Graph):
 		# print(type(out[0]))
 		#now N*P*S*k
 		# out = self.op.stack(out).transpose([1,0,2,3])
-		out = chainer.functions.stack(out)
-		out = chainer.functions.transpose(out, axes=[1,0,2,3])
+		out = self.op.stack(out)
+
+		out = out.transpose([1,0,2,3])
+		# out = self.op.transpose(out, axes=[1,0,2,3])
 
 		#now N*P*S
 		out = self.sigmoid(self.linear1(out))
@@ -118,7 +122,7 @@ class pooling(Graph):
 		super().__init__(device=device)
 		self.device = device
 		self.own = own
-		self.link = True
+		self.link = False
 
 		# if(type(param)==int):
 		# 	self.register_weights('weights', np.random.randn(param))
@@ -131,23 +135,24 @@ class pooling(Graph):
 		'''
 
 		self.key = key
+		self.op = VariableOperation(device=self.device)
 
 	def forward(self, x):
 		# print(x.shape, self.weights.shape)
 
-		x, weights = chainer.functions.broadcast(x, self.weights)
+		# x, weights = self.op.run.broadcast(x, self.weights)
 		# print(x.shape, weights.shape)
 
 		# x = x*self.weights.chainer
-		x = x*weights
+		x = x*self.weights
 		# print(type(x))
 
 		if(self.key=='sum'):
 			x = x.sum(axis=0)
 			# x = torch.sum(x, dim=0)
 		elif(self.key=='max'):
-			# x = x.max(axis=0)
-			x = chainer.functions.max(x, axis=0)
+			x = x.max(axis=0)
+			# x = self.op.max(x, axis=0)
 			# x = torch.max(x, dim=0)[0]
 		else:
 			raise ValueError("key is neither sum nor max")
@@ -176,11 +181,11 @@ class pnn_layer(Graph):
 			INDEX.append([i+x*self.dilation for x in range(self.size)])
 
 		INDEX = tensor(INDEX, device=self.device)
-		outputs = X.ndarray[INDEX.ndarray]
+		outputs = X.ndarray[INDEX.astype('int64').ndarray.squeeze()]
 		outputs = outputs.sum(axis=1)
 		#now is of F*N*S*k
 
-		outputs = tensor(outputs, device=self.device)
+		# outputs = tensor(outputs, device=self.device)
 		return outputs
 
 

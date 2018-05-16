@@ -1,5 +1,5 @@
-from . import Variable, np, cp, tensor
-import chainer
+from . import Variable, tensor
+import torch
 
 
 
@@ -11,17 +11,16 @@ def wrapper(fun, device, *x, **kwargs):
 				i.to_device(device)
 			_x.append(chainer.Variable(i.ndarray))
 
-		elif isinstance(i, (chainer.Variable, chainer.Parameter)):
-			#TODO:
-			# if device != i.device:
-			# 	i = i.to_gpu(device)
+		elif isinstance(i, torch.autograd.Variable):
+			if device != i.device:
+				i = i.cuda(device)
 			_x.append(i)
 		elif isinstance(i, Variable):
 			if device != i.device:
 				i = i.to_device(device)
 			_x.append(i.var)
 		else:
-			raise ValueError("input type is neither tensor, chainer.Variable, nor chainer.Parameter, but {}".format(type(i)))
+			raise ValueError("input type is neither tensor, nor torch.autograd.Variable, but {}".format(type(i)))
 	return fun(*_x, **kwargs)
 
 

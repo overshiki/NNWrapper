@@ -1,4 +1,4 @@
-from .. import tensor, VarBase, np, device_guard
+from .. import tensor, VarBase, np, device_guard, torch
 
 def type_check(self, other):
 	number_check = False
@@ -10,13 +10,22 @@ def type_check(self, other):
 	elif np.isscalar(other):
 		var = other
 		number_check = True
+	elif isinstance(other, (torch.autograd.Variable, torch.nn.Parameter)):
+		# if self.var.ndim!=other.ndim:
+		# 	self.var, var = chainer.functions.broadcast(self.var, other)
+		var = other
+		variable_check = True
 	else:
 		raise TypeError("input other is not VarBase nor tensor nor scalar variable, but to be: {}".format(type(other)))
 
 	if number_check==False:
-		if var.device!=self.device:
-			var.to_device(self.device)
-		return var.var
+		if variable_check==False:
+			if var.device!=self.device:
+				var.to_device(self.device)
+			return var.var
+		else:
+			return var 
+			#TODO: device transfer
 	else:
 		return var
 
@@ -108,7 +117,7 @@ def absolute(self):  # abs(x)
 	Returns:
 		tensor: Output tensor.
 	"""
-	return self.new(abs(self.var), device=self.device)
+	return self.new(self.var.abs(), device=self.device)
 
 
 def eq(self, rhs):  # rhs == lhs

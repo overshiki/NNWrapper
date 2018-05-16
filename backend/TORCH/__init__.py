@@ -1,33 +1,26 @@
 import numpy as np
-class empty:
-	def __init__(self, ):
-		self.core = self
-		self.ndarray = self
+import torch
 
-try:
-	import cupy as cp
-except:
-	print("no cupy avaliable on device")
-	cp = empty()
-	pass
+from ...utils.serialization import *
+from ..base import base
 
 
 
-from .tensor import device_guard, tensor, TensorBase
+from .basic import Variable, Parameter, tensor, VarBase, TensorBase, device_guard
 
-# from .variable import Variable, Parameter, VarBase
+from ..operation import _OperationBase
 
-# from .operation import operation
+from .operation import TensorOperation, VariableOperation
 
 # from .pool import task_parallel
 
-# from .base import Graph, GraphList, F, L
+from .base import Graph, GraphList
 # from .wrapper import wrapper
 
-# from .nodes import *
+from .nodes import *
 
 from .math.tensor_math import install_variable_arithmetics as iva_tensor
-# from .math.variable_math import install_variable_arithmetics as iva_variable
+from .math.variable_math import install_variable_arithmetics as iva_variable
 
 iva_tensor()
-# iva_variable()
+iva_variable()
